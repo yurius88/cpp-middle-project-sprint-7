@@ -40,12 +40,19 @@ target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_imp)
 # Тесты
 #
 
+# Включаем тестирование
+enable_testing()
+
 # Рекурсивно ищем все используемые в тестах .cpp файлы
 file(GLOB TEST_SRC_FILES "${CMAKE_SOURCE_DIR}/tests/*.cpp")
 
 add_executable(unit_tests "${TEST_SRC_FILES}")
 target_link_libraries(unit_tests PRIVATE ${PROJECT_NAME}_imp GTest::GTest)
 
-# Включаем тестирование
-enable_testing()
 add_test(NAME Tests COMMAND unit_tests)
+
+# Интеграционный тест: origin на python, клиент wget, прокси между ними
+add_test(
+    NAME IntegrationTest
+    COMMAND python3 "${CMAKE_SOURCE_DIR}/tests/integration_test.py" $<TARGET_FILE:${PROJECT_NAME}>)
+set_tests_properties(IntegrationTest PROPERTIES TIMEOUT 60 SKIP_RETURN_CODE 77)
