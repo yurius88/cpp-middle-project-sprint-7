@@ -31,6 +31,11 @@ bool isNameEquals(std::string_view lhs, std::string_view rhs) {
                               [](unsigned char a, unsigned char b) { return std::tolower(a) == std::tolower(b); });
 }
 
+bool isPortValid(std::string_view port_str) {
+    uint16_t parsed = 0;
+    const auto parse_result = std::from_chars(port_str.data(), port_str.data() + port_str.size(), parsed);
+    return parse_result.ec == std::errc{};
+}
 }  // namespace
 
 void iterHeaders(std::string_view req, Callback &&callback) {
@@ -66,7 +71,7 @@ void iterHeaders(std::string_view req, Callback &&callback) {
     }
 }
 
-std::pair<std::string, std::string> findHostPort(std::string_view req) {
+HostInfo findHostPort(std::string_view req) {
     std::optional<std::string_view> host_value;
 
     iterHeaders(req, [&host_value](std::string_view name, std::string_view value) {
@@ -84,7 +89,12 @@ std::pair<std::string, std::string> findHostPort(std::string_view req) {
         return {std::string(*host_value), std::string(kDefaultPort)};
     }
 
-    return {std::string(host_value->substr(0, colon_pos)), std::string(host_value->substr(colon_pos + 1))};
+    const auto port_str = std::string(host_value->substr(colon_pos + 1));
+    if (!isPortValid(port_str)) {
+        throw std::runtime_error("Port is invalid");
+    }
+
+    return {std::string(host_value->substr(0, colon_pos)), port_str};
 }
 
 std::optional<size_t> findContentLength(std::string_view rsp) {
@@ -93,6 +103,11 @@ std::optional<size_t> findContentLength(std::string_view rsp) {
     iterHeaders(rsp, [&result](std::string_view name, std::string_view value) {
         if (!isNameEquals(name, kContentLengthHeader)) {
             return;
+        }
+
+        constexpr size_t value_max_size = 20;
+        if (value.size() > value_max_size) {
+            throw std::runtime_error("value size too big");
         }
 
         size_t parsed = 0;
